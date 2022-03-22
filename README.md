@@ -1,4 +1,4 @@
-# Studi - B3 IW - PHP7-8 MVC from scratch
+# Studi - PHP7-8 MVC from scratch
 
 ## Introduction
 
