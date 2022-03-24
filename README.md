@@ -157,3 +157,262 @@ On pourra ensuite facilement lancer le serveur depuis un terminal avec `composer
   //...
 }
 ```
+
+## Point théorique rapide sur le modèle MVC
+
+L'architecture MVC (Modèle - Vue - Contrôleur) constitue une évolution des architectures classiques, dans la mesure où elle apporte une **séparation de responsabilités**, pour les répartir dans différentes **couches** :
+
+### Modèle
+
+Le modèle va être la couche de données. C'est au niveau du modèle que nous **définirons** des classes PHP, que nous appellerons des **entités**. Ces entités seront automatiquement transformées en **tables** dans la base de données. Nous pourrons ensuite utiliser et manipuler des instances de ces classes pour effectuer des opérations dans la base de données.
+
+### Vue
+
+La vue va être chargée **d'afficher les données**. Cette couche regroupera l'ensemble des templates nécessaires à un affichage cohérent de l'application.
+
+### Contrôleur
+
+Les différents **contrôleurs** que nous créerons dans notre application auront pour simple but de **coordonner** le modèle et la vue. C'est à ce niveau que se trouveront les principales briques **logiques** de l'application. Le rôle du contrôleur est d'agir en tant que **glue** entre le modèle et la vue.
+
+## Le modèle
+
+Afin d'éviter d'avoir à écrire une énorme quantité de classes gérant la génération de requêtes SQL via des méthodes diverses pour communiquer avec une base de données, nous pouvons ajouter et utiliser la première **dépendance** de notre projet : l'[ORM Doctrine](https://www.doctrine-project.org/index.html).
+
+> Un ORM (Object Relational Mapper) permet simplement, depuis notre application, de communiquer avec une base de données en utilisant une syntaxe objet
+
+### Création de la base de données
+
+Rendez-vous dans PhpMyAdmin et créez une nouvelle base de données, `php_mvc` par exemple.
+
+> Dans cette application, nous ne disposons malheureusement pas des commandes fournies par des frameworks comme Symfony ou Laravel, nous permettant de créer automatiquement la base de données. Nous la créons donc manuellement, au préalable
+
+### Installation de Doctrine
+
+Une page est disponible sur leur documentation pour son [installation et sa configuration](https://www.doctrine-project.org/projects/doctrine-orm/en/2.11/reference/configuration.html) sans framework.
+
+Le package qui nous intéresse est `doctrine/orm` (on retrouve ici la partie `vendor/package`).
+
+Avec Composer, en ligne de commande, on peut ajouter cette dépendance : `composer require doctrine/orm`.
+
+Automatiquement, Composer ajoute notre dépendance dans le fichier `composer.json`.
+
+Egalement, il a créé automatiquement un fichier `composer.lock` contenant **les versions précises des packages installés**. En effet, Doctrine ORM déclare lui-même des dépendances. Composer parcourt et installe donc en cascade les différentes dépendances.
+
+Dans notre fichier `composer.json` on ne voit donc que Doctrine, mais dans le fichier `composer.lock` apparaissent tous les packages installés.
+
+> Le fichier `composer.lock` est versionné. Cela permet à quelqu'un souhaitant récupérer ce projet d'installer précisément les mêmes versions que celles que nous avons, avec un simple `composer install`
+
+Concernant le format des versions lui-même, il faut savoir que Composer utilise le versioning sémantique ([SemVer](https://semver.org/lang/fr/)).
+
+Outils utiles :
+
+- [SemVer Cheatsheet](https://devhints.io/semver)
+- [Online SemVer Checker](https://jubianchi.github.io/semver-check/#/)
+
+### Configuration de Doctrine
+
+Nous utiliserons le point d'entrée de notre application pour charger et configurer Doctrine.
+
+Doctrine fonctionne avec des **entités**, classes PHP transformées en tables de notre base de données.
+
+Nous allons donc lui fournir le chemin vers le dossier dans lequel se trouveront nos entités : `src/Entity` (nos classes d'entités auront donc le namespace `App\Entity`).
+
+Nous activons ensuite le mode développement, puis définissons les coordonnées de la base de données.
+
+> Dans une prochaine étape, nous déporterons les identifiants de connexion à la base dans des fichiers séparés, non versionnés
+
+Finalement, nous récupérons un objet de configuration, puis créons un gestionnaire d'entités (`EntityManager`) à l'aide des coordonnées de connexion et de l'objet de configuration.
+
+> C'est cet `EntityManager` qui nous permettra d'échanger avec notre base de données
+
+Enfin, selon les préconisations de la documentation, pour pouvoir utiliser des commandes de la console et créer notre schéma, le mettre à jour, etc..., nous créons un fichier `cli-config.php` à la racine du projet.
+
+Une fois Doctrine configuré, depuis notre terminal, nous pouvons exécuter la commande suivante pour consulter les commandes Doctrine disponibles : `php vendor/bin/doctrine list`.
+
+### Création d'une première entité
+
+Nous allons créer une entité `User`. Cette entité sera donc une classe PHP utilisant les **annotations Doctrine**, pour permettre à Doctrine d'analyser le format de l'entité, et pouvoir impacter la base de données automatiquement en conséquence.
+
+Dans le dossier `src/Entity`, créer un fichier `User.php`.
+
+Les différentes annotations utilisées (`Entity`, `Table`, `Column`, ...) définissent donc les différentes propriétés de l'entité ([référence de toutes les annotations](https://www.doctrine-project.org/projects/doctrine-orm/en/2.11/reference/annotations-reference.html#index)).
+
+Pour valider le schéma créé, exécuter :
+
+```bash
+php vendor/bin/doctrine orm:validate-schema
+```
+
+Normalement, Doctrine va pouvoir indiquer que le format d'entité est correct, mais que la base de données n'est pas synchronisée avec notre codebase !
+
+Nous allons donc créer le schéma de la base de données automatiquement, avec la commande suivante :
+
+```bash
+php vendor/bin/doctrine orm:schema-tool:create
+```
+
+Si on retourne dans PhpMyAdmin, on remarque que la table a été créée.
+
+### Insertion d'un enregistrement en base de données
+
+Nous avons à présent configuré Doctrine et créé notre base de données et notre schéma.
+
+Nous allons tenter de créer un enregistrement `User` dans la table associée, depuis notre application.
+
+Pour ce faire, nous allons implémenter 3 étapes :
+
+- Création d'une instance d'objet `User` et affectation de ses champs
+- Persistence de l'objet auprès du gestionnaire d'entités
+- Déclenchement de l'insertion de l'objet ou des objets persistés avec `flush` sur le gestionnaire d'entités
+
+```php
+$user = new User();
+
+$user->setName("Gray")
+  ->setFirstname("Amanda")
+  ->setUsername("Alex Payne")
+  ->setPassword(password_hash('test', PASSWORD_BCRYPT))
+  ->setEmail("mozefebid@nol.mg")
+  ->setBirthDate(new DateTime('1985-05-03'));
+
+// Persist permet uniquement de dire au gestionnaire d'entités de gérer l'entité passée en paramètre
+// Persist ne déclenche pas automatiquement une insertion
+$entityManager->persist($user);
+// Pour déclencher l'insertion, on doit appeler la méthode "flush" sur le gestionnaire d'entités
+$entityManager->flush();
+```
+
+### Le problème des assets (fichiers statiques)
+
+Lorsqu'on consulte `localhost:8000`, le navigateur envoie en réalité 2 requêtes :
+
+- Une pour notre page, vers `/`
+- Une autre pour récupérer le favicon `/favicon.ico`
+
+Etant donné que nous avons configuré notre serveur pour qu'il redirige tout vers `public/index.php`, alors notre requête est exécutée 2 fois, et il en résulte que deux enregistrements sont persistés en base de données.
+
+Nous devons donc filtrer les requêtes entrantes, pour pouvoir servir les éléments statiques directement, sans mettre en oeuvre la logique de notre application.
+
+Pour commencer, nous pouvons indiquer dans notre point d'entrée la chose suivante : si on vient bien d'une page web, et que l'URI demandée termine par une extension de fichier image, alors on retourne `false`. Cela permet d'envoyer directement la ressource demandée, ou bien une 404 si elle n'est pas trouvée.
+
+## Un point sur les dépendances
+
+### Récupération du projet
+
+Lorsqu'on clône un projet existant, on n'a pas toutes les dépendances installées par défaut. On ne dispose que des sources de l'application.
+
+On a également deux fichiers : `composer.json`, là où on déclare nos dépendances, et `composer.lock`, qui vient **verrouiller** l'état de toutes nos dépendances.
+
+Lors de la récupération du projet, suite à un `git clone` par exemple, on exécutera simplement `composer install` pour installer l'ensemble des dépendances dans le dossier `vendor/`.
+
+> C'est pour ça que notre dossier `vendor/` se trouve dans le fichier `.gitignore`. On n'a pas besoin de versionner les dépendances du projet, puisque n'importe qui peut les installer avec `composer install` quand il le récupère sur sa machine
+
+### Mise à jour des dépendances
+
+Lorsqu'on souhaite mettre à jour les dépendances du projet, suite à un correctif par exemple, qui donnerait une nouvelle version "de patch", on exécutera la commande `composer update`.
+
+Si une nouvelle version satisfait l'intervalle de versions acceptables qu'on a déclaré dans notre fichier `composer.json`, alors une mise à jour sera effectuée.
+
+## Configuration
+
+Nous avons un autre problème à régler : la configuration pour accéder à la base de données se trouve dans le fichier `public/index.php`, et est versionnée. Elle apparaît donc dans ce dépôt Github, en clair.
+
+Ensuite, si quelqu'un d'autre clône ce dépôt, alors soit on sera obligé de s'adapter aux paramètres déclarés dans le fichier, soit on devra changer les paramètres. Mais si on les change, alors du point de vue de Git, il y aura un changement de fichier à commiter.
+
+Nous avons donc besoin d'externaliser la configuration de notre application, et de pouvoir ensuite y faire référence depuis notre application.
+
+Par ailleurs, pour allier flexibilité et sécurité, on ne verra donc plus les paramètres en clair dans le code versionné.
+
+### Les fichiers .env
+
+Les fichiers .env permettent de stocker des paires de clés/valeurs.
+
+Ensuite, on peut utiliser un package comme `symfony/dotenv` pour lire le contenu du fichier et le mapper automatiquement dans le tableau superglobal `$_ENV` de PHP.
+
+On installe donc le composant DotEnv de Symfony : `composer require symfony/dotenv`.
+
+Ensuite, on peut donc déclarer des valeurs par défaut pour nos variables, dans un fichier `.env`.
+
+Les valeurs effectivement utilisées en local, sur notre machine, peuvent quant à elle être déclarée dans un fichier `.env.local`, non versionné sur Git.
+
+> Le fichier `.env` contient donc des valeurs par défaut et sera versionné. Le fichier `.env.local`, non versionné, viendra, pour chaque environnement différent, écraser les valeurs par défaut, pour avoir la configuration adaptée à chaque machine (ou environnement). Du point de vue de l'application, on se contente donc de faire référence à la configuration, sans utiliser de valeurs explicites
+
+Par ailleurs, le composer DotEnv de Symfony introduit également une variable `APP_ENV`, positionnée par défaut à la valeur `dev`. Cette variable peut permettre de configurer les packages selon l'environnement dans lequel on se trouve.
+
+## Les contrôleurs et le routage des requêtes
+
+Pour le moment, notre page d'accueil crée un utilisateur et l'enregistre en BDD. Tout ça se déroule dans le fichier `public/index.php`.
+
+Mais nous préférerions pouvoir définir plusieurs endroits correspondant aux différentes "pages" de notre application.
+
+Par ailleurs, on aimerait pouvoir les définir en étant adapté à un format d'URL comme `/user/profile`, ou encore `/admin/product/edit/5`.
+
+Pour réceptionner les requêtes et les traiter, on va créer une couche de **contrôleurs**.
+
+Ensuite, pour pouvoir trouver le bon contrôleur à exécuter lors de la réception d'une requête, nous aurons besoin d'un **routeur**.
+
+### Contrôleurs
+
+Comme indiqué précédemment, un contrôleur n'agit qu'en tant que **glue** entre le modèle et la vue.
+
+On peut donc déplacer le bout de code qui crée un utilisateur dans une classe `App\Controller\IndexController`
+
+### Routeur
+
+Dans l'index, il est donc maintenant question d'enregistrer des routes, puis de dispatcher une requête entrante auprès du routeur, afin qu'il puisse router cette requête vers le bon contrôleur, en fonction de ses routes enregistrées.
+
+La classe `Router` est donc définie dans un premier temps avec les méthodes suivantes :
+
+- `addRoute` pour ajouter une route
+- `execute` pour router une requête vers la bonne route
+- `getRoute` pour vérifier qu'une route correspondant à une URL et une méthode HTTP existe ou non
+
+Dans le fichier `public/index.php`, on peut donc ajouter notre route pour la page d'accueil :
+
+```php
+$router->addRoute(
+  'home',
+  '/',
+  'GET',
+  IndexController::class,
+  'index'
+);
+```
+
+On peut ajouter/déclarer autant de routes qu'on souhaite dans notre application, puis appeler la méthode `execute` avec l'URL demandée par un client :
+
+```php
+$requestUri = $_SERVER['REQUEST_URI'];
+$requestMethod = $_SERVER['REQUEST_METHOD'];
+
+$router->execute($requestUri, $requestMethod);
+```
+
+#### Un point rapide sur la gestion des erreurs et l'écriture des méthodes
+
+Du point de vue de notre `Router`, nous devons stocker des routes, puis être capable d'en retrouver une si besoin et de l'exécuter.
+
+Nous avons donc défini 3 méthodes permettant d'implémenter ces différentes fonctionnalités.
+
+La signature de la méthode `getRoute` nous indique qu'elle peut retourner un `array` ou bien `null`.
+
+Lorsqu'on appelle `execute` sur notre routeur, nous allons donc gérer le cas dans lequel aucune route n'est trouvée (valeur `null`).
+
+Ceci pourrait être fait de diverses manières. Nous avons opté pour une levée d'exception en cas de route non trouvée.
+
+Ainsi, nous pouvons signaler à tout code appelant notre routeur qu'une route n'a pas été trouvée, et ainsi déléguer à ce code appelant la **responsabilité** de l'action à effectuer.
+
+Ce qu'il faut retenir ici, c'est que ce n'est probablement pas le rôle du routeur de décider quoi faire en cas de page non trouvée, mais davantage au code qui appelle le routeur de se débrouiller avec ça.
+
+Ainsi, dans notre cas, il peut être plus judicieux de gérer l'erreur avec un bloc `try...catch` au niveau de notre fichier `index.php` :
+
+```php
+try {
+  $router->execute($requestUri, $requestMethod);
+} catch (RouteNotFoundException $e) {
+  http_response_code(404);
+  echo "Page non trouvée";
+}
+```
+
+> La définition d'une classe d'exception personnalisée, ici `RouteNotFoundException`, nous permet d'une part une gestion plus fine des exceptions éventuellement levées par notre routeur, mais également d'écrire un code plus clair : nous pouvons **lire** beaucoup plus facilement que dans notre fichier `index.php`, en cas de route non trouvée, on envoie un code 404 et un texte "Page non trouvée"
