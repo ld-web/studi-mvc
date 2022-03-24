@@ -9,7 +9,10 @@ if (
   return false;
 }
 
-use App\Entity\User;
+use App\Controller\IndexController;
+use App\Controller\UserController;
+use App\Routing\RouteNotFoundException;
+use App\Routing\Router;
 use Doctrine\ORM\Tools\Setup;
 use Doctrine\ORM\EntityManager;
 use Symfony\Component\Dotenv\Dotenv;
@@ -36,17 +39,37 @@ if (php_sapi_name() === 'cli') {
   return;
 }
 
-// Page
-$user = new User();
+$router = new Router();
 
-$user->setName("Gray")
-  ->setFirstname("Amanda")
-  ->setUsername("Alex Payne")
-  ->setPassword(password_hash('test', PASSWORD_BCRYPT))
-  ->setEmail("mozefebid@nol.mg")
-  ->setBirthDate(new DateTime('1985-05-03'));
+$router->addRoute(
+  'user_create',
+  '/user/create',
+  'GET',
+  UserController::class,
+  'create'
+);
+$router->addRoute(
+  'homepage',
+  '/',
+  'GET',
+  IndexController::class,
+  'home'
+);
+$router->addRoute(
+  'contact_page',
+  '/contact',
+  'GET',
+  IndexController::class,
+  'contact'
+);
 
-var_dump($user);
+$requestUri = $_SERVER['REQUEST_URI'];
+$requestMethod = $_SERVER['REQUEST_METHOD'];
 
-$entityManager->persist($user);
-$entityManager->flush();
+try {
+  $router->execute($requestUri, $requestMethod);
+} catch (RouteNotFoundException $e) {
+  http_response_code(404);
+  echo "<p>Page non trouvée</p>";
+  echo "<p>" . $e->getMessage() . "</p>";
+}
