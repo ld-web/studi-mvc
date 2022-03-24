@@ -39,7 +39,7 @@ if (php_sapi_name() === 'cli') {
   return;
 }
 
-$router = new Router();
+$router = new Router($entityManager);
 
 $router->addRoute(
   'user_create',

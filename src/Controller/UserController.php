@@ -8,7 +8,7 @@ use Doctrine\ORM\EntityManager;
 
 class UserController
 {
-  public function create(EntityManager $entityManager)
+  public function create(EntityManager $em)
   {
     $user = new User();
 
@@ -21,7 +21,7 @@ class UserController
 
     var_dump($user);
 
-    $entityManager->persist($user);
-    $entityManager->flush();
+    $em->persist($user);
+    $em->flush();
   }
 }
