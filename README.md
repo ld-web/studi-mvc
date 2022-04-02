@@ -416,3 +416,76 @@ try {
 ```
 
 > La définition d'une classe d'exception personnalisée, ici `RouteNotFoundException`, nous permet d'une part une gestion plus fine des exceptions éventuellement levées par notre routeur, mais également d'écrire un code plus clair : nous pouvons **lire** beaucoup plus facilement que dans notre fichier `index.php`, en cas de route non trouvée, on envoie un code 404 et un texte "Page non trouvée"
+
+#### Identifier les dépendances avec l'API Reflection
+
+Pour identifier les dépendances, ou paramètres d'une méthode, nous pouvons nous appuyer sur l'API [Reflection](https://www.php.net/manual/en/book.reflection).
+Cette API nous permet d'inspecter les **métadonnées** d'une classe, d'une méthode, fonction, etc...
+
+Quand notre routeur trouve une méthode correspondant à l'URL de la requête, donc un contrôleur, nous n'avons donc plus qu'à instancier un objet [ReflectionMethod](https://www.php.net/manual/en/class.reflectionmethod.php) et récupérer les différents paramètres.
+
+```php
+$methodInfos = new ReflectionMethod($controllerName . '::' . $method);
+$methodParameters = $methodInfos->getParameters();
+```
+
+Ensuite, nous pouvons boucler sur les paramètres pour récupérer le type, le nom, etc...
+
+```php
+foreach ($methodParameters as $param) {
+  $paramName = $param->getName();
+  $paramType = $param->getType()->getName();
+}
+```
+
+Au sein du routeur même, nous allons donc créer dans un premier temps un attribut `$services` qui permettra de fournir à un contrôleur la dépendance déclarée, si on la trouve dans cette collection :
+
+```php
+private array $services = [];
+```
+
+Le tableau de services nous permettra donc d'enregistrer un ou plusieurs services applicatifs, le but étant de les fournir quand une autre partie de notre application en a besoin.
+
+Ensuite, dans le constructeur du routeur, nous allons récupérer une instance de l'EntityManager afin de l'enregistrer dans les services disponibles :
+
+```php
+public function __construct(EntityManager $entityManager)
+{
+  $this->services[EntityManager::class] = $entityManager;
+}
+```
+
+> Note : nous enregistrons ici un service, avec comme clé le FQCN de sa classe, et comme valeur l'instance que nous souhaitons fournir. Le fait de préciser le FQCN en tant que clé nous permet d'identifier de manière précise le service voulu. En effet, si dans un contrôleur on type un paramètre avec un type de classe, alors c'est son FQCN. L'API Reflection nous permettra donc de faire correspondre le FQCN déclaré dans le paramètre du contrôleur avec le FQCN enregistré en tant que clé dans le tableau de services
+
+Quand on revient sur notre méthode `execute`, alors nous pouvons profiter de ce tableau de services lors de l'identification des paramètres du contrôleur. On va même créer une méthode privée `getMethodParams` qui aura pour seule responsabilité de nous retourner un tableau avec les paramètres déclarés et les instances correspondantes qui ont été trouvées.
+
+Bien sûr, cette méthode récupère les services dans l'attribut `services` :
+
+```php
+if (array_key_exists($paramType, $this->services)) {
+  $params[$paramName] = $this->services[$paramType];
+}
+```
+
+Et dans la méthode `execute` :
+
+```php
+$params = $this->getMethodParams($controller, $method);
+
+$controllerInstance = new $controller();
+call_user_func_array(
+  [$controllerInstance, $method],
+  $params
+);
+```
+
+La méthode de la SPL `call_user_func_array` nous permet d'appeler dynamiquement une méthode sur un objet. Nous instancions donc la classe de contrôleur de manière dynamique avec `$controllerInstance = new $controller();`, puis nous utilisons `call_user_func_array` pour appeler la méthode voulue, avec les paramètres récupérés de notre tableau de services :
+
+```php
+call_user_func_array(
+  [$controllerInstance, $method],
+  $params
+);
+```
+
+Nous venons de réaliser notre premier mécanisme d'injection de dépendances : en fonction de ce qu'un contrôleur déclare comme paramètre, le routeur va récupérer une instance correspondant à ce paramètre et l'injecter automatiquement lors de l'appel du contrôleur.
