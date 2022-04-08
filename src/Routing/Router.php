@@ -2,17 +2,24 @@
 
 namespace App\Routing;
 
+use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManager;
 use ReflectionMethod;
+use Twig\Environment;
 
 class Router
 {
   private array $routes = [];
   private array $services = [];
 
-  public function __construct(EntityManager $entityManager)
-  {
+  public function __construct(
+    EntityManager $entityManager,
+    Environment $twig,
+    UserRepository $userRepository
+  ) {
     $this->services[EntityManager::class] = $entityManager;
+    $this->services[Environment::class] = $twig;
+    $this->services[UserRepository::class] = $userRepository;
   }
 
   /**

@@ -2,15 +2,17 @@
 
 namespace App\Controller;
 
+use Twig\Environment;
+
 class IndexController
 {
-  public function home()
+  public function home(Environment $twig)
   {
-    echo "COUCOU !";
+    echo $twig->render('home.html.twig');
   }
 
-  public function contact()
+  public function contact(Environment $twig)
   {
-    echo "PAGE DE CONTACT !";
+    echo $twig->render('contact.html.twig');
   }
 }

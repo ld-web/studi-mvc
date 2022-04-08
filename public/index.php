@@ -11,17 +11,25 @@ if (
 
 use App\Controller\IndexController;
 use App\Controller\UserController;
+use App\Entity\User;
+use App\Repository\UserRepository;
 use App\Routing\RouteNotFoundException;
 use App\Routing\Router;
 use Doctrine\ORM\Tools\Setup;
 use Doctrine\ORM\EntityManager;
+use Doctrine\ORM\Mapping\ClassMetadata;
 use Symfony\Component\Dotenv\Dotenv;
+use Twig\Environment;
+use Twig\Loader\FilesystemLoader;
 
+// --- ENV VARS
 $dotenv = new Dotenv();
 $dotenv->loadEnv(__DIR__ . '/../.env');
+// --- ENV VARS
 
+// --- DOCTRINE
 $paths = ['src/Entity'];
-$isDevMode = true;
+$isDevMode = $_ENV['APP_ENV'] === 'dev';
 
 $dbParams = [
   'driver'   => $_ENV['DB_DRIVER'],
@@ -34,12 +42,25 @@ $dbParams = [
 
 $config = Setup::createAnnotationMetadataConfiguration($paths, $isDevMode, null, null, false);
 $entityManager = EntityManager::create($dbParams, $config);
+// --- DOCTRINE
+
+// --- TWIG
+$loader = new FilesystemLoader(__DIR__ . '/../templates');
+$twig = new Environment($loader, [
+  'debug' => $_ENV['APP_ENV'] === 'dev',
+  'cache' => __DIR__ . '/../var/cache/twig'
+]);
+// --- TWIG
+
+// --- REPOSITORIES
+$userRepository = new UserRepository($entityManager);
+// --- REPOSITORIES
 
 if (php_sapi_name() === 'cli') {
   return;
 }
 
-$router = new Router($entityManager);
+$router = new Router($entityManager, $twig, $userRepository);
 
 $router->addRoute(
   'user_create',
@@ -61,6 +82,13 @@ $router->addRoute(
   'GET',
   IndexController::class,
   'contact'
+);
+$router->addRoute(
+  'users_list',
+  '/users/list',
+  'GET',
+  UserController::class,
+  'list'
 );
 
 $requestUri = $_SERVER['REQUEST_URI'];

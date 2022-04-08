@@ -3,8 +3,10 @@
 namespace App\Controller;
 
 use App\Entity\User;
+use App\Repository\UserRepository;
 use DateTime;
 use Doctrine\ORM\EntityManager;
+use Twig\Environment;
 
 class UserController
 {
@@ -23,5 +25,14 @@ class UserController
 
     $em->persist($user);
     $em->flush();
+  }
+
+  public function list(Environment $twig, UserRepository $userRepository)
+  {
+    // récupérer tous les utilisateurs
+    $users = $userRepository->findAll();
+
+    // Transmettre à la vue la liste des utilisateurs à afficher
+    echo $twig->render('users/list.html.twig', ['users' => $users]);
   }
 }

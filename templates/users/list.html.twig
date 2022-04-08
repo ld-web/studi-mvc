@@ -1,0 +1,24 @@
+{% extends 'base.html.twig' %}
+
+{% block body %}
+	<div class="container">
+		<h1 class="display-3">Utilisateurs</h1>
+		<h3 class="display-5">Nombre d'utilisateurs :
+			{{ users|length }}</h3>
+
+		<div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 row-cols-xl-4 g-4">
+			{% for user in users %}
+				<div class="col">
+					<div class="card">
+						<div class="card-body">
+							<h5 class="card-title">{{ user.name }}</h5>
+							<p class="card-text">{{ user.email }}</p>
+						</div>
+					</div>
+				</div>
+			{% else %}
+				<div>Aucun utilisateur trouvé.</div>
+			{% endfor %}
+		</div>
+	</div>
+{% endblock %}
