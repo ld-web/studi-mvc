@@ -2,17 +2,15 @@
 
 namespace App\Controller;
 
-use Twig\Environment;
-
-class IndexController
+class IndexController extends AbstractController
 {
-  public function home(Environment $twig)
+  public function home()
   {
-    echo $twig->render('home.html.twig');
+    echo $this->twig->render('home.html.twig');
   }
 
-  public function contact(Environment $twig)
+  public function contact()
   {
-    echo $twig->render('contact.html.twig');
+    echo $this->twig->render('contact.html.twig');
   }
 }

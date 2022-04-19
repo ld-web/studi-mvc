@@ -8,8 +8,16 @@ use DateTime;
 use Doctrine\ORM\EntityManager;
 use Twig\Environment;
 
-class UserController
+class UserController extends AbstractController
 {
+  private UserRepository $userRepository;
+
+  public function __construct(Environment $twig, UserRepository $userRepository)
+  {
+    parent::__construct($twig);
+    $this->userRepository = $userRepository;
+  }
+
   public function create(EntityManager $em)
   {
     $user = new User();
@@ -27,12 +35,12 @@ class UserController
     $em->flush();
   }
 
-  public function list(Environment $twig, UserRepository $userRepository)
+  public function list()
   {
     // récupérer tous les utilisateurs
-    $users = $userRepository->findAll();
+    $users = $this->userRepository->findAll();
 
     // Transmettre à la vue la liste des utilisateurs à afficher
-    echo $twig->render('users/list.html.twig', ['users' => $users]);
+    echo $this->twig->render('users/list.html.twig', ['users' => $users]);
   }
 }
