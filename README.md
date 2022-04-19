@@ -489,3 +489,398 @@ call_user_func_array(
 ```
 
 Nous venons de réaliser notre premier mécanisme d'injection de dépendances : en fonction de ce qu'un contrôleur déclare comme paramètre, le routeur va récupérer une instance correspondant à ce paramètre et l'injecter automatiquement lors de l'appel du contrôleur.
+
+## La vue
+
+Nous avons monté la couche de **Modèle** et la couche de **Contrôleurs** dans notre application.
+
+Il nous manque encore de quoi afficher les données correctement. Pour monter cette dernière couche, nous allons utiliser un moteur de template, [Twig](https://twig.symfony.com/).
+
+Une fois que nous aurons mis en place nos trois couches, nous pourrons alors affiner les mécanismes déjà mis en place. Nous ne nous contenterons donc pas **uniquement** d'installer un moteur de template, le but va être, une fois que nous aurons nos 3 couches MVC, d'articuler et organiser la manière dont elles vont communiquer.
+
+La documentation est assez claire pour l'installation de Twig. Ajout de la dépendance via Composer, puis adaptation du code dans `public/index.php` afin de désigner le dossier racine des templates.
+
+Nous ajouterons tout de même la recompilation du cache à chaque rafraîchissement, uniquement en mode `dev` : `'debug' => ($_ENV['APP_ENV'] === 'dev')`. On utilise la variable d'environnement `APP_ENV` comme indiqué dans la partie `Configuration`, pour avoir une configuration dynamique, en fonction de l'environnement :
+
+```php
+// index.php
+$loader = new FilesystemLoader(__DIR__ . '/../templates'); // <-- dossier racine de nos templates
+$twig = new Environment($loader, [
+  'debug' => $_ENV['APP_ENV'] === 'dev',
+  'cache' => __DIR__ . '/../var/cache/twig'
+]);
+```
+
+On indique également un dossier de _cache_. En effet, Twig va compiler les templates que nous allons écrire afin d'en faire des fichiers PHP. Ces fichiers étant par défaut très variables, il faut les isoler dans un dossier particulier, qui ne sera pas intégré au contrôle de version, donc au dépôt Git.
+
+### Utilisation de Twig dans les contrôleurs
+
+Une fois Twig installé, nous pouvons alors commencer l'écriture de nos premiers templates.
+
+Mais dans un premier temps, il faut déterminer comment nous allons pouvoir utiliser la vue dans nos contrôleurs.
+
+> Rappel : dans un contrôleur, l'exemple courant d'exécution est le suivant : je requête le modèle, puis je transmets à la vue les données reçues
+
+Précédemment, lors de nos travaux sur le routeur et les dépendances, nous avons vu comment enregistrer dans le routeur les services que l'on veut rendre disponibles pour les contrôleurs.
+
+Ainsi, si dans un contrôleur je souhaite utiliser Twig, je vais l'ajouter en paramètre du contrôleur :
+
+```php
+use Twig\Environment;
+
+class IndexController
+{
+  public function home(Environment $twig)
+  {
+    echo $twig->render('home.html.twig');
+  }
+
+  public function contact(Environment $twig)
+  {
+    echo $twig->render('contact.html.twig');
+  }
+}
+```
+
+> On va créer les templates `home.html.twig` et `contact.html.twig` dans le dossier `templates` à la racine du projet
+
+Le type souhaité est `Twig\Environment`, correspondant au type de la variable créée dans index.php. Ce sera le service de notre vue, nous permettant d'afficher des templates.
+
+Ainsi, dans le routeur, je vais ajouter Twig à mes services, et dans `index.php`, le fournir au routeur :
+
+> Router.php
+
+```php
+class Router
+{
+  // ...
+
+  public function __construct(
+    EntityManager $entityManager,
+    Environment $twig
+  ) {
+    $this->services[EntityManager::class] = $entityManager;
+    $this->services[Environment::class] = $twig;
+  }
+
+  // ...
+}
+```
+
+> index.php
+
+```php
+// ...
+$router = new Router($entityManager, $twig);
+// ...
+```
+
+### Création des templates
+
+Dans les contrôleurs `home` et `contact` de la classe `IndexController`, on demande à Twig de rendre des templates `home.html.twig` et `contact.html.twig`.
+
+Nous allons donc les créer dans le dossier `templates` à la racine du projet :
+
+> templates/home.html.twig
+
+```twig
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>STUDI</title>
+    <!-- CSS only -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
+  </head>
+  <body>
+    <h1>COUCOU !</h1>
+    <p>Test</p>
+    <p>Comment ça va ?</p>
+  
+    <!-- JavaScript Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p" crossorigin="anonymous"></script>
+  </body>
+</html>
+```
+
+> templates/contact.html.twig
+
+```twig
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>STUDI</title>
+    <!-- CSS only -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
+  </head>
+  <body>
+    <div class="container">
+      <h1>CONTACT</h1>
+      <div class="alert alert-primary" role="alert">
+        A simple primary alert—check it out!
+      </div>
+    </div>
+  
+    <!-- JavaScript Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p" crossorigin="anonymous"></script>
+  </body>
+</html>
+```
+
+> On a ajouté la librairie Bootstrap avec un CDN pour avoir une base de CSS déjà en place
+
+Ces deux templates se ressemblent beaucoup.
+
+Avec Twig, on a la possibilité de **séparer les templates**, de **déclarer des blocs**, et d'**hériter des templates**.
+
+Nous pouvons donc définir le schéma suivant pour notre layout :
+
+![twig_base_extends](docs/twig_base_extends.png "twig_base_extends")
+
+Et dans le code :
+
+> base.html.twig
+
+```twig
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>
+      {% block title %}STUDI
+      {% endblock %}
+    </title>
+    {% block stylesheets %}
+    <!-- CSS only -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
+    {% endblock %}
+  </head>
+  <body>
+    {% block body %}{% endblock %}
+
+    {% block javascripts %}
+    <!-- JavaScript Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p" crossorigin="anonymous"></script>
+    {% endblock %}
+  </body>
+</html>
+
+```
+
+> home.html.twig
+
+```twig
+{% extends 'base.html.twig' %}
+
+{% block body %}
+  <h1>COUCOU !</h1>
+  <p>Test</p>
+  <p>Comment ça va ?</p>
+{% endblock %}
+```
+
+> contact.html.twig
+
+```twig
+{% extends 'base.html.twig' %}
+
+{% block title %}
+  {{ parent() }}
+  - CONTACT
+{% endblock %}
+
+{% block body %}
+  <div class="container">
+    <h1>CONTACT</h1>
+    <div class="alert alert-primary" role="alert">
+      A simple primary alert—check it out!
+    </div>
+  </div>
+{% endblock %}
+```
+
+Ce schéma pourra donc être étendu pour tout autre template que nous aurons besoin de définir à l'avenir.
+
+### La question des données
+
+Nos 3 couches sont à présent en place. Les exemples donnés ci-dessus sont assez simples et n'impliquent pas l'affichage de données.
+
+Pour afficher de la donnée, prenons par exemple notre classe de contrôleurs d'utilisateurs, `UserController`, et ajoutons un contrôleur de liste d'utilisateurs :
+
+```php
+class UserController
+{
+  // ...
+  public function list(Environment $twig)
+  {
+    // récupérer tous les utilisateurs
+    $users = [];
+
+    // Transmettre à la vue la liste des utilisateurs à afficher
+    echo $twig->render('users/list.html.twig', ['users' => $users]);
+  }
+}
+```
+
+Nous souhaitons donc récupérer la liste de tous les utilisateurs et la transmettre à une vue. Nous devons donc trouver un moyen de communiquer avec le modèle.
+
+#### Les repositories
+
+Pour communiquer avec le modèle depuis un contrôleur, nous allons utiliser les **repositories** de Doctrine.
+
+> Les repositories vont agir comme une couche de service nous permettant de requêter la base de données à propos d'une entité
+
+Dans un premier temps, nous devons revenir à la classe (ou entité) `User` afin d'indiquer à Doctrine la classe de Repository à laquelle nous souhaitons associer notre entité :
+
+> User.php
+
+```php
+/**
+ * @ORM\Entity(repositoryClass="App\Repository\UserRepository")
+ * @ORM\Table(name="users")
+ */
+class User
+{
+  //...
+}
+```
+
+Nous indiquons donc à Doctrine le **FQCN** de la classe servant de repository à notre entité `User`.
+
+Par la suite, nous allons créer le dossier `src/Repository` et allons demander à Doctrine de générer un template de Repository avec la ligne de commande :
+
+```bash
+php vendor/bin/doctrine orm:generate-repositories src/Repository
+```
+
+> Attention, il est possible que Doctrine génère des sous-dossiers `App/Repository` dans le dossier `src/Repository`. Déplacez le fichier `UserRepository.php` dans le dossier `src/Repository` pour qu'il corresponde précisément à son FQCN
+
+Doctrine va donc nous générer un template de Repository :
+
+> src/Repository/UserRepository.php
+
+```php
+<?php
+namespace App\Repository;
+
+/**
+ * UserRepository
+ *
+ * This class was generated by the Doctrine ORM. Add your own custom
+ * repository methods below.
+ */
+class UserRepository extends \Doctrine\ORM\EntityRepository
+{
+}
+```
+
+A quoi va nous servir cette classe ?
+
+Elle hérite de la classe `Doctrine\ORM\EntityRepository`. Cette classe, créée et mise à disposition par Doctrine ORM, va nous permettre d'appeler des méthodes utilitaires pour communiquer avec notre base de données plus facilement.
+
+Par exemple :
+
+- [find](https://github.com/doctrine/orm/blob/2.11.x/lib/Doctrine/ORM/EntityRepository.php#L173) nous permettant de rechercher directement un enregistrement à l'aide de son ID
+- [findAll](https://github.com/doctrine/orm/blob/2.11.x/lib/Doctrine/ORM/EntityRepository.php#L183) qui va aller chercher tous les enregistrements d'une table
+- [findBy](https://github.com/doctrine/orm/blob/2.11.x/lib/Doctrine/ORM/EntityRepository.php#L199) qui nous permettra de spécifier des critères de recherche, comme une clause `WHERE`
+
+Nous aurons donc besoin de la méthode `findAll` dans notre contrôleur, pour récupérer tous les enregistrements, donc tous les utilisateurs de la base de données.
+
+Dans le contrôleur `list`, nous allons donc pouvoir ajouter `UserRepository` en tant que paramètre :
+
+```php
+use App\Repository\UserRepository;
+use Twig\Environment;
+
+class UserController
+{
+  // ...
+
+  public function list(Environment $twig, UserRepository $userRepository)
+  {
+    // récupérer tous les utilisateurs
+    $users = $userRepository->findAll();
+
+    // Transmettre à la vue la liste des utilisateurs à afficher
+    echo $twig->render('users/list.html.twig', ['users' => $users]);
+  }
+}
+```
+
+Comme nous l'avons déjà fait pour Twig, nous pouvons alors intervenir dans notre routeur et notre fichier `index.php` pour ajouter notre Repository aux services disponibles pour injection :
+
+> Router.php
+
+```php
+class Router
+{
+  private array $routes = [];
+  private array $services = [];
+
+  public function __construct(
+    EntityManager $entityManager,
+    Environment $twig,
+    UserRepository $userRepository
+  ) {
+    $this->services[EntityManager::class] = $entityManager;
+    $this->services[Environment::class] = $twig;
+    $this->services[UserRepository::class] = $userRepository;
+  }
+}
+```
+
+> index.php
+
+```php
+$userRepository = new UserRepository($entityManager);
+```
+
+##### Note sur la construction du Repository
+
+Dans le fichier `index.php`, on notera la construction du Repository :
+
+```php
+$userRepository = new UserRepository($entityManager);
+```
+
+Il faut se référer à la classe parente, `Doctrine\ORM\EntityRepository`, et modifier le Repository pour comprendre.
+
+Concernant la classe `Doctrine\ORM\EntityRepository`, son [constructeur](https://github.com/doctrine/orm/blob/2.11.x/lib/Doctrine/ORM/EntityRepository.php#L54) est défini de la façon suivante :
+
+```php
+public function __construct(EntityManagerInterface $em, Mapping\ClassMetadata $class)
+{
+  $this->_entityName = $class->name;
+  $this->_em         = $em;
+  $this->_class      = $class;
+}
+```
+
+Afin d'éviter d'avoir à préciser le second paramètre du constructeur à chaque fois, on va surcharger directement le constructeur dans la classe `UserRepository` :
+
+```php
+use App\Entity\User;
+use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\Mapping\ClassMetadata;
+
+class UserRepository extends \Doctrine\ORM\EntityRepository
+{
+  public function __construct(EntityManagerInterface $em)
+  {
+    parent::__construct($em, new ClassMetadata(User::class));
+  }
+}
+```
+
+Ainsi, on n'aura plus qu'à fournir l'EntityManager au Repository, depuis le fichier `index.php`.
+
+Les services de notre routeur connaissent à présent notre `UserRepository`, qui sera donc injecté dans le contrôleur `list`.
+
+Depuis le contrôleur, on pourra donc consommer la méthode `findAll` héritée de la classe `EntityRepository`, afin de récupérer l'ensemble des utilisateurs et les transmettre à la vue avec la dépendance Twig.
