@@ -11,6 +11,7 @@ if (
 
 use App\Controller\IndexController;
 use App\Controller\UserController;
+use App\DependencyInjection\Container;
 use App\Repository\UserRepository;
 use App\Routing\RouteNotFoundException;
 use App\Routing\Router;
@@ -54,11 +55,18 @@ $twig = new Environment($loader, [
 $userRepository = new UserRepository($entityManager);
 // --- REPOSITORIES
 
+// --- CONTAINER
+$container = new Container();
+$container->set(EntityManager::class, $entityManager);
+$container->set(Environment::class, $twig);
+$container->set(UserRepository::class, $userRepository);
+// --- CONTAINER
+
 if (php_sapi_name() === 'cli') {
   return;
 }
 
-$router = new Router($entityManager, $twig, $userRepository);
+$router = new Router($container);
 
 $router->addRoute(
   'user_create',

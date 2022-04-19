@@ -2,24 +2,17 @@
 
 namespace App\Routing;
 
-use App\Repository\UserRepository;
-use Doctrine\ORM\EntityManager;
+use Psr\Container\ContainerInterface;
 use ReflectionMethod;
-use Twig\Environment;
 
 class Router
 {
   private array $routes = [];
-  private array $services = [];
+  private ContainerInterface $container;
 
-  public function __construct(
-    EntityManager $entityManager,
-    Environment $twig,
-    UserRepository $userRepository
-  ) {
-    $this->services[EntityManager::class] = $entityManager;
-    $this->services[Environment::class] = $twig;
-    $this->services[UserRepository::class] = $userRepository;
+  public function __construct(ContainerInterface $container)
+  {
+    $this->container = $container;
   }
 
   /**
@@ -106,8 +99,8 @@ class Router
       $paramName = $param->getName();
       $paramType = $param->getType()->getName();
 
-      if (array_key_exists($paramType, $this->services)) {
-        $params[$paramName] = $this->services[$paramType];
+      if ($this->container->has($paramType)) {
+        $params[$paramName] = $this->container->get($paramType);
       }
     }
 
