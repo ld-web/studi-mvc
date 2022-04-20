@@ -15,9 +15,9 @@ use App\DependencyInjection\Container;
 use App\Repository\UserRepository;
 use App\Routing\RouteNotFoundException;
 use App\Routing\Router;
-use Doctrine\ORM\Tools\Setup;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\Mapping\Driver\AttributeDriver;
+use Doctrine\ORM\ORMSetup;
 use Symfony\Component\Dotenv\Dotenv;
 use Twig\Environment;
 use Twig\Loader\FilesystemLoader;
@@ -40,7 +40,7 @@ $dbParams = [
   'dbname'   => $_ENV['DB_NAME']
 ];
 
-$config = Setup::createAnnotationMetadataConfiguration($paths, $isDevMode, null, null, false);
+$config = ORMSetup::createAnnotationMetadataConfiguration($paths, $isDevMode, null, null, false);
 $entityManager = EntityManager::create($dbParams, $config);
 
 $driver = new AttributeDriver($paths);

@@ -24,6 +24,6 @@
     "doctrine/annotations": "^1.13",
     "symfony/dotenv": "^5.4",
     "twig/twig": "^3.0",
-    "psr/container": "^1.1"
+    "psr/container": "^2.0"
   }
 }
