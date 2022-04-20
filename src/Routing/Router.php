@@ -2,7 +2,9 @@
 
 namespace App\Routing;
 
+use App\Routing\Attribute\Route;
 use Psr\Container\ContainerInterface;
+use ReflectionClass;
 use ReflectionMethod;
 
 class Router
@@ -105,5 +107,40 @@ class Router
     }
 
     return $params;
+  }
+
+  public function registerRoutes(): void
+  {
+    $controllerFiles = scandir(__DIR__ . '/../Controller');
+    $controllerFiles = array_slice($controllerFiles, 2);
+    $controllerClassNames = array_map(fn ($filename) => pathinfo($filename, PATHINFO_FILENAME), $controllerFiles);
+
+    foreach ($controllerClassNames as $class) {
+      $fqcn = "App\\Controller\\" . $class;
+      $reflection = new ReflectionClass($fqcn);
+
+      if ($reflection->isAbstract()) {
+        continue;
+      }
+
+      $methods = $reflection->getMethods(ReflectionMethod::IS_PUBLIC);
+
+      foreach ($methods as $method) {
+        $attributes = $method->getAttributes(Route::class);
+
+        foreach ($attributes as $attribute) {
+          /** @var Route */
+          $route = $attribute->newInstance();
+
+          $this->addRoute(
+            $route->getName(),
+            $route->getPath(),
+            $route->getHttpMethod(),
+            $fqcn,
+            $method->getName()
+          );
+        }
+      }
+    }
   }
 }

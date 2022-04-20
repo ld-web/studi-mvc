@@ -71,35 +71,7 @@ if (php_sapi_name() === 'cli') {
 }
 
 $router = new Router($container);
-
-$router->addRoute(
-  'user_create',
-  '/user/create',
-  'GET',
-  UserController::class,
-  'create'
-);
-$router->addRoute(
-  'homepage',
-  '/',
-  'GET',
-  IndexController::class,
-  'home'
-);
-$router->addRoute(
-  'contact_page',
-  '/contact',
-  'GET',
-  IndexController::class,
-  'contact'
-);
-$router->addRoute(
-  'users_list',
-  '/users/list',
-  'GET',
-  UserController::class,
-  'list'
-);
+$router->registerRoutes();
 
 $requestUri = $_SERVER['REQUEST_URI'];
 $requestMethod = $_SERVER['REQUEST_METHOD'];
