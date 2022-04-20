@@ -5,47 +5,29 @@ namespace App\Entity;
 use Doctrine\ORM\Mapping as ORM;
 use DateTime;
 
-/**
- * @ORM\Entity(repositoryClass="App\Repository\UserRepository")
- * @ORM\Table(name="users")
- */
+#[ORM\Entity(repositoryClass: "App\Repository\UserRepository")]
+#[ORM\Table(name: "users")]
 class User
 {
-  /**
-   * @ORM\Id
-   * @ORM\Column(type="integer")
-   * @ORM\GeneratedValue(strategy="AUTO")
-   */
+  #[ORM\Id, ORM\Column(type: "integer"), ORM\GeneratedValue(strategy: "AUTO")]
   private int $id;
 
-  /**
-   * @ORM\Column(type="string", length=255)
-   */
+  #[ORM\Column(type: "string", length: 255)]
   private string $name;
 
-  /**
-   * @ORM\Column(type="string", length=255)
-   */
+  #[ORM\Column(type: "string", length: 255)]
   private string $firstname;
 
-  /**
-   * @ORM\Column(type="string", length=255)
-   */
+  #[ORM\Column(type: "string", length: 255)]
   private string $username;
 
-  /**
-   * @ORM\Column(type="string", length=255)
-   */
+  #[ORM\Column(type: "string", length: 255)]
   private string $password;
 
-  /**
-   * @ORM\Column(type="string", length=255)
-   */
+  #[ORM\Column(type: "string", length: 255)]
   private string $email;
 
-  /**
-   * @ORM\Column(type="datetime", nullable=true)
-   */
+  #[ORM\Column(type: "datetime", nullable: true)]
   private DateTime $birthDate;
 
   public function getId(): int

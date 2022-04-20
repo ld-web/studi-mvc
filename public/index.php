@@ -17,6 +17,7 @@ use App\Routing\RouteNotFoundException;
 use App\Routing\Router;
 use Doctrine\ORM\Tools\Setup;
 use Doctrine\ORM\EntityManager;
+use Doctrine\ORM\Mapping\Driver\AttributeDriver;
 use Symfony\Component\Dotenv\Dotenv;
 use Twig\Environment;
 use Twig\Loader\FilesystemLoader;
@@ -41,6 +42,9 @@ $dbParams = [
 
 $config = Setup::createAnnotationMetadataConfiguration($paths, $isDevMode, null, null, false);
 $entityManager = EntityManager::create($dbParams, $config);
+
+$driver = new AttributeDriver($paths);
+$entityManager->getConfiguration()->setMetadataDriverImpl($driver);
 // --- DOCTRINE
 
 // --- TWIG
