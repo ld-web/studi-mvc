@@ -3,6 +3,7 @@
 namespace App\Routing;
 
 use App\Routing\Attribute\Route;
+use App\Utils\Filesystem;
 use Psr\Container\ContainerInterface;
 use ReflectionClass;
 use ReflectionMethod;
@@ -11,6 +12,8 @@ class Router
 {
   private array $routes = [];
   private ContainerInterface $container;
+  private const CONTROLLERS_DIRECTORY = __DIR__ . '/../Controller';
+  private const CONTROLLERS_NAMESPACE = "App\\Controller\\";
 
   public function __construct(ContainerInterface $container)
   {
@@ -111,12 +114,10 @@ class Router
 
   public function registerRoutes(): void
   {
-    $controllerFiles = scandir(__DIR__ . '/../Controller');
-    $controllerFiles = array_slice($controllerFiles, 2);
-    $controllerClassNames = array_map(fn ($filename) => pathinfo($filename, PATHINFO_FILENAME), $controllerFiles);
+    $controllerClassNames = Filesystem::getClassNames(self::CONTROLLERS_DIRECTORY);
 
     foreach ($controllerClassNames as $class) {
-      $fqcn = "App\\Controller\\" . $class;
+      $fqcn = self::CONTROLLERS_NAMESPACE . $class;
       $reflection = new ReflectionClass($fqcn);
 
       if ($reflection->isAbstract()) {
@@ -126,6 +127,10 @@ class Router
       $methods = $reflection->getMethods(ReflectionMethod::IS_PUBLIC);
 
       foreach ($methods as $method) {
+        if ($method->isConstructor()) {
+          continue;
+        }
+
         $attributes = $method->getAttributes(Route::class);
 
         foreach ($attributes as $attribute) {
