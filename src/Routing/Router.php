@@ -74,8 +74,7 @@ class Router
     }
 
     $controller = $route['controller'];
-    $constructorNamedParams = $this->getMethodParams($controller, '__construct');
-    $constructorParams = array_values($constructorNamedParams);
+    $constructorParams = $this->getMethodParams($controller, '__construct');
     $controllerInstance = new $controller(...$constructorParams);
 
     $method = $route['method'];
