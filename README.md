@@ -937,3 +937,107 @@ $controllerInstance = new $controller(...$constructorParams); // <-- En PHP8, on
 Ainsi, vu que tous nos contrôleurs concrets héritent du `AbstractController`, ils hériteront alors de son constructeur, qui déclare déjà Twig en tant que dépendance.
 
 N'importe lequel des contrôleurs concrets pourra alors déclarer ses propres dépendances supplémentaires, s'il le souhaite.
+
+## Retour sur le routeur
+
+A partir de là, notre MVC pourrait être considéré comme terminé. Nous avons réalisé la couche de modèle, de vue, et de contrôleur.
+
+Cependant, nous pouvons encore le faire évoluer.
+
+### Un container de services
+
+Pour réaliser notre injection de dépendances, on passe au routeur des services, puis la méthode `getMethodParams` se charge d'aller chercher les dépendances dans le tableau de services du routeur.
+
+Nous pouvons faire évoluer cette logique en passant par un container de services, séparé du routeur.
+
+Ainsi, le routeur n'aura plus à porter toute la logique d'enregistrement et de récupération des services. Certes, il devra connaître le container, mais nous allons changer le code pour que le routeur ne soit plus chargé que de demander au container s'il a tel ou tel service, s'il peut récupérer tel ou tel service, etc...
+
+Pour aller un peu plus loin, nous rendrons notre container compatible PSR-11.
+
+La recommandation [PSR-11](https://www.php-fig.org/psr/psr-11/) définit une interface `ContainerInterface`, donc un contrat d'implémentation commun pour les containers d'injection de dépendances. Par exemple, le composant [`dependency-injection`](https://symfony.com/doc/current/components/dependency_injection.html) de Symfony implémente cette interface.
+
+En réalisant un container de services compatible PSR-11, nous ouvrons la voie vers de possibles futures évolutions. En effet, on pourrait, à l'avenir, décider d'utiliser le composant `dependency-injection` de Symfony, au lieu de notre container, par exemple. Le container de Symfony est bien plus évolué. Dans ce cas, notre routeur s'appuiera déjà sur un container compatible PSR-11. Il y aura probablement d'autres modifications à faire, mais ceci peut probablement nous faire gagner un peu de temps si l'on veut changer.
+
+> Le point principal à retenir est le suivant : depuis le routeur, nous consommerons un container de services compatible PSR-11. Ainsi, du point de vue du routeur, quel que soit le container concret dont on disposera, et la manière dont il récupère les services, on saura qu'il devra implémenter les méthodes définies dans l'interface `ContainerInterface`. Ce mécanisme s'appelle l'inversion de dépendance ([pour aller plus loin](https://en.wikipedia.org/wiki/Dependency_inversion_principle))
+
+Nous allons donc déplacer notre tableau de services dans une classe `App\DependencyInjection\Container`. Cette classe déclarera implémenter l'interface `ContainerInterface` avec `class Container implements ContainerInterface`, et fournira donc une implémentation des méthodes définies dans cette interface.
+
+En plus des méthodes `get` et `has` définies par l'interface, on implémentera une méthode `set` pour pouvoir enregistrer un service dans le container.
+
+On déplace donc notre tableau de services dans la classe `Container` :
+
+```php
+namespace App\DependencyInjection;
+
+use InvalidArgumentException;
+use Psr\Container\ContainerInterface;
+
+class Container implements ContainerInterface
+{
+  private array $services = [];
+
+  public function get(string $id)
+  {
+    if (!$this->has($id)) {
+      throw new ServiceNotFoundException($id);
+    }
+
+    return $this->services[$id];
+  }
+
+  public function has(string $id): bool
+  {
+    return array_key_exists($id, $this->services);
+  }
+
+  public function set(string $id, object $service)
+  {
+    if ($this->has($id)) {
+      throw new InvalidArgumentException("Le service $id existe déjà");
+    }
+
+    $this->services[$id] = $service;
+  }
+}
+```
+
+> Note : l'id du service, dont on va se servir comme clé du tableau associatif de services, sera pour notre cas le FQCN du service souhaité. Dans le tableau de services, on fera donc correspondre à un FQCN donné une instance de service disponible. D'où la possibilité d'indiquer le type en paramètre d'un contrôleur ou d'un constructeur
+
+Dans le routeur, il reste à remplacer le tableau de services par un attribut désignant une `ContainerInterface` (inversion de dépendances) :
+
+```php
+class Router
+{
+  private array $routes = [];
+  private ContainerInterface $container;
+
+  public function __construct(ContainerInterface $container)
+  {
+    $this->container = $container;
+  }
+}
+```
+
+On instanciera donc un container dans le bootstrap de notre application, fichier `public/index.php`, puis on enregistrera dans ce container le ou les services qu'on veut, avant de pouvoir fournir le container au Routeur.
+
+Enfin, dans le routeur, à l'endroit où on effectue la résolution des dépendances, on va à présent interroger le container :
+
+> src/Routing/Router.php
+
+```php
+private function getMethodParams(string $controller, string $method): array
+{
+  //...
+  foreach ($methodParameters as $param) {
+    $paramName = $param->getName();
+    $paramType = $param->getType()->getName();
+
+    if ($this->container->has($paramType)) { // <-- Si le container possède un service correspondant à ce FQCN
+      $params[$paramName] = $this->container->get($paramType); // <-- Alors on l'intègre aux paramètres qui seront retournés
+    }
+  }
+  //...
+}
+```
+
+Notre injection de dépendances fonctionne toujours de la même façon. La seule différence, c'est l'endroit où se trouvent les services : dans un container de services, dédié au stockage et à la récupération de services applicatifs.
