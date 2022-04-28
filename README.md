@@ -884,3 +884,56 @@ Ainsi, on n'aura plus qu'à fournir l'EntityManager au Repository, depuis le fic
 Les services de notre routeur connaissent à présent notre `UserRepository`, qui sera donc injecté dans le contrôleur `list`.
 
 Depuis le contrôleur, on pourra donc consommer la méthode `findAll` héritée de la classe `EntityRepository`, afin de récupérer l'ensemble des utilisateurs et les transmettre à la vue avec la dépendance Twig.
+
+## Un contrôleur abstrait
+
+Nous savons que la plupart de nos contrôleurs (voire tous) auront besoin de Twig pour rendre des templates, donc des pages web.
+
+Nous aurions donc besoin d'injecter `Environment` dans chacun de ces contrôleurs.
+
+Pour éviter de le réécrire à chaque fois, on peut remonter l'instance de Twig au niveau des attributs du contrôleur. Et dans un second temps, remonter l'instance de Twig au niveau d'une classe parente, elle-même abstraite. Ainsi, tous les contrôleurs héritant de cette classe pourront utiliser l'instance de Twig, et donc rendre des templates.
+
+> src/Controller/AbstractController.php
+
+```php
+namespace App\Controller;
+
+use Twig\Environment;
+
+abstract class AbstractController
+{
+  protected Environment $twig;
+
+  public function __construct(Environment $twig)
+  {
+    $this->twig = $twig;
+  }
+}
+```
+
+### Injection de dépendance dans le constructeur
+
+La problématique que cela pose, c'est que pour le moment, depuis notre routeur, nous avons la possibilité d'injecter des dépendances dans un contrôleur directement, pas un constructeur.
+
+La bonne nouvelle, ceci dit, c'est que pour identifier les dépendances d'un contrôleur, nous avons écrit une méthode `getMethodParams` dans le routeur.
+
+Nous pouvons donc la réutiliser pour identifier les dépendances présentes dans un constructeur, et donc instancier un contrôleur de manière dynamique :
+
+> Note : vous trouverez ci-dessous une méthode pour PHP7 et une autre pour PHP8. En effet, en PHP7 il n'est pas possible d'éclater, avec l'opérateur spread (les 3 petits points), un tableau associatif ayant des index non numériques. En PHP7, on va donc ajouter une étape pour transformer le tableau en tableau classique, avec des index numériques uniquement
+
+```php
+$controller = $route['controller'];
+
+// PHP7
+$constructorNamedParams = $this->getMethodParams($controller, '__construct');
+$constructorParams = array_values($constructorNamedParams); // <-- Ici, on ne garde que les valeurs, pas les index
+$controllerInstance = new $controller(...$constructorParams);
+
+// PHP8
+$constructorParams = $this->getMethodParams($controller, '__construct');
+$controllerInstance = new $controller(...$constructorParams); // <-- En PHP8, on peut déstructurer un tableau associatif
+```
+
+Ainsi, vu que tous nos contrôleurs concrets héritent du `AbstractController`, ils hériteront alors de son constructeur, qui déclare déjà Twig en tant que dépendance.
+
+N'importe lequel des contrôleurs concrets pourra alors déclarer ses propres dépendances supplémentaires, s'il le souhaite.
