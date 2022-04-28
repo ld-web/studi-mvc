@@ -1041,3 +1041,130 @@ private function getMethodParams(string $controller, string $method): array
 ```
 
 Notre injection de dépendances fonctionne toujours de la même façon. La seule différence, c'est l'endroit où se trouvent les services : dans un container de services, dédié au stockage et à la récupération de services applicatifs.
+
+## Retour sur le routeur (BIS) - Les attributs PHP8
+
+La version 8 de PHP apporte de nouvelles fonctionnalités au langage ([8.0](https://www.php.net/releases/8.0/en.php), [8.1](https://www.php.net/releases/8.1/en.php)).
+
+Nous allons reprendre notre routeur pour utiliser une de ces fonctionnalités, [les attributs](https://www.php.net/manual/en/language.attributes.php).
+
+### Les attributs, c'est quoi ?
+
+Les attributs permettent de définir de manière structurée et native des **métadonnées** sur des éléments définis dans notre application : classes, méthodes, etc...
+
+Les métadonnées d'un élément vont nous permettre de pouvoir lire des informations concernant cet élément : sur une méthode par exemple, s'agit-il d'une route ? La présence d'un attribut nous permettra de détecter automatiquement ce genre de choses.
+
+Avant la version 8 de PHP, le mécanisme largement utilisé pour définir des métadonnées sur un élément était les **annotations** : on définissait des métadonnées dans le _DocBlock_ de l'élément, donc en commentaire, de manière structurée.
+
+Mais cette méthode n'était pas réellement native au langage.
+
+L'arrivée des attributs permet d'utiliser le même type de syntaxe mais de manière beaucoup plus structurée.
+
+Exemple avec les annotations (avant PHP8) :
+
+```php
+class PostsController
+{
+    /**
+     * @Route("/api/posts/{id}", methods={"GET"})
+     */
+    public function get($id) { /* ... */ }
+}
+```
+
+Exemple avec les attributs (à partir de PHP8) :
+
+```php
+class PostsController
+{
+    #[Route("/api/posts/{id}", methods: ["GET"])]
+    public function get($id) { /* ... */ }
+}
+```
+
+Ce que nous allons faire, c'est donc créer un attribut PHP8, `Route`, que nous allons ensuite utiliser sur nos méthodes de contrôleurs. Ainsi, nous pourrons **détecter** automatiquement toutes les routes à enregistrer dans notre routeur.
+
+Nous n'aurons donc plus besoin d'ajouter manuellement un appel à `addRoute` dans notre fichier `public/index.php`.
+
+### Créer un attribut
+
+Pour créer un attribut, on crée une classe, que l'on annote avec l'attribut `#[Attribute]`.
+
+```php
+namespace App\Routing\Attribute;
+
+use Attribute;
+
+#[Attribute]
+class Route
+{
+  //...
+}
+```
+
+> On peut également restreindre sur quel type d'élément de langage l'attribut pourra être utilisé (classe, méthode, ...). Voir [ce lien](https://www.php.net/manual/en/language.attributes.classes.php), exemple n°2
+
+Dans cette classe, on va reproduire la structure d'une route telle qu'on en a besoin dans notre routeur : nom, URL (path), méthode HTTP.
+
+> Nous n'aurons pas besoin de redéfinir la classe de contrôleurs et la méthode. En effet, lorsque nous traiterons cet attribut, nous serons précisément dans le contexte de la classe et la méthode. Nul besoin de se répéter, donc.
+
+### Utiliser l'attribut dans nos contrôleurs
+
+Une fois notre attribut écrit, nous pouvons donc l'ajouter à nos méthodes de contrôleurs :
+
+```php
+namespace App\Controller;
+
+use App\Routing\Attribute\Route;
+use Doctrine\ORM\EntityManager;
+
+class IndexController extends AbstractController
+{
+  #[Route(path: "/", name: 'home')]
+  public function home()
+  {
+    echo $this->twig->render('home.html.twig');
+  }
+}
+```
+
+La syntaxe est très simple : nous appelons l'attribut comme si nous appelions son **constructeur**. En réalité, quand nous aurons besoin d'instancier cet attribut, PHP va utiliser les arguments nommés ([autre nouvelle fonctionnalité de PHP8](https://www.php.net/releases/8.0/en.php#named-arguments)) que nous lui indiquons pour le construire.
+
+### Lire les attributs d'un élément
+
+Nous avons créé notre attribut, et l'avons utilisé dans nos contrôleurs. Il nous faut maintenant modifier notre routeur, pour le rendre capable d'aller chercher tout seul l'ensemble des routes déclarées dans notre application.
+
+Pour ce faire, nous aurons besoin d'implémenter les étapes suivantes :
+
+- Récupérer les classes de contrôleurs (donc scanner le répertoire des contrôleurs)
+- Pour chaque classe, récupérer les éventuels attributs `Route` déclarés sur les méthodes se trouvant dans la classe (donc les contrôleurs)
+- Si on dispose d'un attribut `Route`, alors l'instancier et le passer à notre méthode `addRoute` pour que le routeur enregistre automatiquement la route déclarée
+
+Nous définissons donc une méthode `registerRoutes` qui se chargera de tout ça pour nous ! Ensuite, nous n'aurons plus qu'à appeler cette méthode depuis le bootstrap de notre application.
+
+La lecture d'un attribut se fait avec la méthode `getAttributes`, ajoutée à l'API Reflection dans la version 8 de PHP.
+
+```php
+// Pour chaque méthode d'une classe de contrôleurs, on va chercher s'il y a un ou plusieurs attributs Route
+foreach ($methods as $method) {
+  $attributes = $method->getAttributes(Route::class); // On filtre pour ne récupérer que les attributs Route. Ici ce n'est que ce type qui nous intéresse
+
+  foreach ($attributes as $attribute) {
+    $route = $attribute->newInstance(); // On instancie la route
+    // Puis on traite l'ajout de la route récupérée...
+    // ...
+  }
+}
+```
+
+Pour finir, dans `public/index.php`, nous faison l'appel :
+
+```php
+// Routage
+$router = new Router($container);
+$router->registerRoutes();
+```
+
+Nos routes sont à présent enregistrées automatiquement au bootstrap de notre application.
+
+La déclaration des routes, quant à elle, se trouve directement "sur" nos contrôleurs. C'est plus pratique car nous regroupons les informations d'un contrôleur à un seul endroit.
